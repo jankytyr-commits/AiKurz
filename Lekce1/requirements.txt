@@ -1,0 +1,10 @@
+flask
+flask-cors
+langchain
+langchain-core
+langchain-google-genai
+google-generativeai
+yfinance
+openpyxl
+requests
+pydantic<2

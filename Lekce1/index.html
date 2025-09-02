@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="cs" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://rsms.me/inter/inter.css');
+        .chat-bubble-user {
+            background-color: #3B82F6; /* modrá */
+            color: white;
+        }
+        .chat-bubble-bot {
+            background-color: #E5E7EB; /* světle šedá */
+            color: #1F2937;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col h-screen">
+
+    <header class="bg-white shadow-md p-4">
+        <h1 class="text-2xl font-bold text-gray-800 text-center">Supervisor Chatbot</h1>
+    </header>
+
+    <main id="chat-container" class="flex-1 p-4 overflow-y-auto">
+        <!-- Chatové zprávy se budou přidávat sem -->
+        <div class="chat-bubble-bot self-start max-w-lg p-3 rounded-lg mb-4">
+            Dobrý den, jsem váš asistent. Na co se chcete zeptat?
+        </div>
+    </main>
+
+    <footer class="bg-white p-4 border-t">
+        <form id="chat-form" class="flex items-center space-x-4">
+            <input type="text" id="message-input" placeholder="Zadejte svůj dotaz..."
+                   class="flex-1 p-3 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   autocomplete="off">
+            <button type="submit" id="send-button"
+                    class="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </form>
+    </footer>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const chatContainer = document.getElementById('chat-container');
+        
+        // Adresa vašeho běžícího Flask API
+        const apiUrl = 'http://127.0.0.1:5000/chat';
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessageToChat('user', message);
+            messageInput.value = '';
+            setLoading(true);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Chyba serveru: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                addMessageToChat('bot', data.reply);
+
+            } catch (error) {
+                console.error('Došlo k chybě:', error);
+                addMessageToChat('bot', 'Omlouvám se, došlo k chybě při komunikaci se serverem.');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function addMessageToChat(sender, text) {
+            const messageDiv = document.createElement('div');
+            const bubbleClass = sender === 'user' ? 'chat-bubble-user self-end' : 'chat-bubble-bot self-start';
+            messageDiv.className = `max-w-lg p-3 rounded-lg mb-4 ${bubbleClass}`;
+            messageDiv.innerText = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Automaticky odscrollovat dolů
+        }
+
+        function setLoading(isLoading) {
+            messageInput.disabled = isLoading;
+            sendButton.disabled = isLoading;
+            if (isLoading) {
+                sendButton.innerHTML = `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            } else {
+                sendButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+            }
+        }
+    </script>
+</body>
+</html>
