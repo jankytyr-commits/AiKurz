@@ -1,0 +1,260 @@
+{
+  "name": "Agent pro správu klientů s LLM (Hotový Cloud-ready)",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "jsonParameters": true,
+        "options": {
+          "bodyContentType": "json"
+        },
+        "bodyParametersJson": "{\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Jsi agent pro správu zákazníků. Odpovídej srozumitelně a přátelsky.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Nalezen klient: Jméno: Daniela Švecová, Email: daniela.14@centrum.cz, Telefon: 734651763, IČO: null, DIČ: null\"\n    }\n  ]\n}\n",
+        "headerParametersJson": "{\n  \"Authorization\": \"Bearer sk-proj-XXXXXXXXXXXX\",\n  \"Content-Type\": \"application/json\"\n}\n"
+      },
+      "id": "0e16a4d2-e0c8-4f64-997c-f198d1d880dc",
+      "name": "OpenAI HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -48
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "qeNZqLSJ3nh9on5s",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "path": "agent",
+        "options": {}
+      },
+      "id": "199e5bed-8558-4c7c-ab82-feb04fd27344",
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        -96
+      ],
+      "webhookId": "agent-webhook-id"
+    },
+    {
+      "parameters": {
+        "functionCode": "let query = '';\nif ($json && $json.query) {\n  if (typeof $json.query === 'object' && $json.query.query) {\n    query = $json.query.query;\n  } else {\n    query = $json.query;\n  }\n}\nreturn [{ json: { query } }];"
+      },
+      "id": "4e1c7830-1952-4a2d-a972-01461f2672f2",
+      "name": "Extract Query1",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const q = String($json.query || '');\nconst result = { email: null, ico: null, id: null };\nconst emailMatch = q.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})/);\nif (emailMatch) result.email = emailMatch[0];\nconst icoMatch = q.match(/ICO[:\\s]*([0-9]{6,10})/i) || q.match(/IČO[:\\s]*([0-9]{6,10})/i) || q.match(/\\b([0-9]{8})\\b/);\nif (icoMatch) result.ico = icoMatch[1] || icoMatch[0];\nconst idMatch = q.match(/Id[:\\s]*([0-9]+)/i);\nif (idMatch) result.id = parseInt(idMatch[1], 10);\nreturn [{ json: result }];"
+      },
+      "id": "03b6b174-ce8c-4a23-92ae-4af43024f029",
+      "name": "Parse Query1",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DECLARE @Email NVARCHAR(255) = {{ $json[\"email\"] ? \"'\" + $json[\"email\"] + \"'\" : \"NULL\" }};\nDECLARE @Ico NVARCHAR(20) = {{ $json[\"ico\"] ? \"'\" + $json[\"ico\"] + \"'\" : \"NULL\" }};\nDECLARE @Id INT = {{ $json[\"id\"] != null ? $json[\"id\"] : \"NULL\" }};\nSELECT Id, Name, Email, Ico, Dic, Phone\nFROM [user]\nWHERE (@Email IS NULL OR Email = @Email)\n  AND (@Ico IS NULL OR Ico = @Ico)\n  AND (@Id IS NULL OR Id = @Id);"
+      },
+      "id": "0f975dac-539c-47ab-acfe-01a0f248c97a",
+      "name": "MSSQL Query1",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -336
+      ],
+      "credentials": {
+        "microsoftSql": {
+          "id": "JtRiVunr0SCWGDrL",
+          "name": "Microsoft SQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const rows = $input.all();\n\nlet messages;\nif (!rows || rows.length === 0) {\n  messages = [\n    { role: 'system', content: 'Jsi agent pro správu zákazníků. Odpovídej srozumitelně a přátelsky.' },\n    { role: 'user', content: 'Klient nebyl nalezen.' }\n  ];\n} else {\n  const r = rows[0].json;\n  messages = [\n    { role: 'system', content: 'Jsi agent pro správu zákazníků. Odpovídej srozumitelně a přátelsky.' },\n    { role: 'user', content: `Nalezen klient: Jméno: ${r.Name}, Email: ${r.Email}, Telefon: ${r.Phone}, IČO: ${r.Ico}, DIČ: ${r.Dic}` }\n  ];\n}\n\nreturn [{\n  json: {\n    body: {\n      model: \"gpt-4o-mini\",\n      messages\n    }\n  }\n}];\n"
+      },
+      "id": "ec4f759e-d589-47d5-8e23-affc0c88e65e",
+      "name": "Format OpenAI Body1",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $json;\nreturn [{ json: { reply: data.choices[0].message.content } }];\n"
+      },
+      "id": "44e10fe0-a2c0-4e50-810f-51c5c1f7daf6",
+      "name": "Extract AI Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// This gets the OpenAI response and extracts only the text.\nconst data = $json;\nlet reply = '';\n\nif (data.choices && data.choices.length > 0) {\n  reply = data.choices[0].message.content;\n}\n\nreturn [{ json: { reply } }];\n"
+      },
+      "id": "c0daddac-e799-4074-8fcf-fdb2ca347edc",
+      "name": "Extract AI Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        208,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"reply\": \"{{$input.first().json.reply}}\"\n}\n",
+        "options": {}
+      },
+      "id": "f9414d41-d583-45ab-93bb-0cf37bab8bb3",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        400,
+        -64
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract AI Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Extract Query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Query1": {
+      "main": [
+        [
+          {
+            "node": "Parse Query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Query1": {
+      "main": [
+        [
+          {
+            "node": "MSSQL Query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MSSQL Query1": {
+      "main": [
+        [
+          {
+            "node": "Format OpenAI Body1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format OpenAI Body1": {
+      "main": [
+        [
+          {
+            "node": "OpenAI HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Error": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1",
+    "errorWorkflow": "AviolS6OSeW0yD8n"
+  },
+  "versionId": "fb62af50-e304-4aa7-9390-f70620b94388",
+  "meta": {
+    "templateId": "ready-to-run-ai-workflow-v1",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fb2eed76cfbd68408df64bdc1cb82785a61df4297f86b5cbd1d6f40e9c27c50c"
+  },
+  "id": "AviolS6OSeW0yD8n",
+  "tags": []
+}
