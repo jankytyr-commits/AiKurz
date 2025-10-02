@@ -1,0 +1,7 @@
+torch>=2.0
+numpy
+gymnasium>=0.29.1
+box2d
+pygame
+tqdm
+tensorboard
